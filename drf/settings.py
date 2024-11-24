@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+import os
 from pathlib import Path
 from datetime import timedelta
 
@@ -42,10 +42,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'authapp',
+    'products',
     'corsheaders',
+    'csp',
+    'django_extensions',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Should be at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -53,13 +57,18 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-
+    'csp.middleware.CSPMiddleware',
 ]
+
+
+# Allow images from the same origin (i.e., your Django server)
+CSP_IMG_SRC = ("'self'", "http://localhost:3000")
 
 ROOT_URLCONF = 'drf.urls'
 AUTH_USER_MODEL= 'authapp.CustomUser'
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CSRF_COOKIE_SECURE = False
 
 TEMPLATES = [
     {
@@ -144,8 +153,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=600),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     # ... other options ...
@@ -157,3 +166,15 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'kulkarnimayuri210@gmail.com'
 EMAIL_HOST_PASSWORD = 'pdcw ohem zino aiqg'
+
+MEDIA_URL = '/media/'  # URL prefix for accessing media files
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # The directory where uploaded files are stored
+BASE_DIR = Path(__file__).resolve().parent.parent
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]

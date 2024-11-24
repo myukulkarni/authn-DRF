@@ -12,7 +12,7 @@ class CustomUser(AbstractUser):
     pincode = models.CharField(max_length=10, blank=True, null=True)
     state = models.CharField(max_length=100, blank=True, null=True)
     is_verified = models.BooleanField(default=False)
-    email_otp = models.CharField(max_length=8, null=True, unique=True)
+    email_otp = models.CharField(max_length=6, null=True, unique=True)
     udf1 = models.CharField(max_length=10, blank=True, null=True)
     udf2 = models.CharField(max_length=10, blank=True, null=True)
     udf3 = models.CharField(max_length=10, blank=True, null=True)
