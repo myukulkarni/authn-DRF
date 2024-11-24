@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -203,3 +204,42 @@ class DeleteFromCartView(APIView):
         # Delete the cart item
         cart_item.delete()
         return Response({"message": "Product removed from cart successfully."}, status=status.HTTP_200_OK)
+=======
+# from django.shortcuts import render
+
+# Create your views here.
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .models import Product
+import json
+
+@csrf_exempt
+@csrf_exempt
+def create_product(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        product = Product(
+            name=data['name'],
+            description=data['description'],
+            price=data['price'],
+            image=data['imageUrl']  # Retrieve the image URL from the request
+        )
+        product.save()
+        return JsonResponse({"message": "Product created successfully!"})
+    else:
+        return JsonResponse({"error": "Invalid request method."}, status=400)
+    
+def get_products(request):
+    products = Product.objects.all()
+    product_list = [
+        {
+            "id": product.id,
+            "name": product.name,
+            "description": product.description,
+            "price": str(product.price),
+            "image": product.image  # This will be the URL of the image
+        }
+        for product in products
+    ]
+    return JsonResponse(product_list, safe=False)
+>>>>>>> 0da9d9919c2e0d416f821a2b0df46d12a2b74e28
