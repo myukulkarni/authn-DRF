@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -204,42 +203,205 @@ class DeleteFromCartView(APIView):
         # Delete the cart item
         cart_item.delete()
         return Response({"message": "Product removed from cart successfully."}, status=status.HTTP_200_OK)
-=======
-# from django.shortcuts import render
 
-# Create your views here.
+from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from .models import Product
-import json
+from django.views import View
+from django.contrib.auth.models import User
+from .models import Product, Comment, Like, Rating
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 
-@csrf_exempt
-@csrf_exempt
-def create_product(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        product = Product(
-            name=data['name'],
-            description=data['description'],
-            price=data['price'],
-            image=data['imageUrl']  # Retrieve the image URL from the request
+# Decorator to ensure the user is logged in
+@method_decorator(login_required, name='dispatch')
+class CommentView(View):
+    def post(self, request, product_id):
+        # Create a new comment
+        product = get_object_or_404(Product, id=product_id)
+        content = request.POST.get('content')
+
+        if content:
+            comment = Comment.objects.create(
+                user=request.user,
+                product=product,
+                content=content
+            )
+            return JsonResponse({'message': 'Comment created successfully!', 'comment_id': comment.id}, status=201)
+        else:
+            return JsonResponse({'error': 'Content is required!'}, status=400)
+        
+        
+def get(self, request, product_id):
+    product = get_object_or_404(Product, id=product_id)
+    comments = product.comment_set.all()  # Retrieve related comments
+    comment_list = [{
+        'user': comment.user.username,
+        'content': comment.content,
+        'created_at': comment.created_at,
+    } for comment in comments]
+    return JsonResponse({'comments': comment_list}, status=200)
+
+
+# views.py
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.db.models import F
+from .models import Product, Like
+
+
+class LikeProductView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, product_id):
+        try:
+            # Get the product
+            product = Product.objects.get(id=product_id)
+
+            # Check if the user has already liked the product
+            like, created = Like.objects.get_or_create(user=request.user, product=product)
+
+            if not created:
+                # If the like already exists, the user is unliking the product
+                like.delete()
+                product.like_count = F('like_count') - 1
+                is_liked = False
+            else:
+                # Otherwise, the user is liking the product
+                product.like_count = F('like_count') + 1
+                is_liked = True
+
+            # Save the product and refresh to get the actual updated count
+            product.save()
+            product.refresh_from_db()
+
+            return Response({
+                "message": "Product liked." if created else "Product unliked.",
+                "like_count": product.like_count,
+                "is_liked": is_liked  # Include this field
+            }, status=status.HTTP_200_OK)
+
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error liking product: {str(e)}")
+            return Response({"error": "Failed to like the product."}, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .models import Product
+from rest_framework import status
+
+class LikedProductsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Fetch all products liked by the authenticated user
+        liked_products = Product.objects.filter(like__user=user)
+
+        # Prepare the list of liked products as dictionaries
+        products_data = [
+            {
+                'id': product.id,
+                'name': product.name,
+                'description': product.description,
+                'price': str(product.price),  # Convert Decimal to string for JSON
+                'image1_url': request.build_absolute_uri(product.image1.url) if product.image1 else None,
+                'like_count': product.like_count,  # Assuming you have a like_count field
+                'is_liked': True,
+            }
+            for product in liked_products
+        ]
+
+        return Response({'liked_products': products_data}, status=status.HTTP_200_OK)
+
+
+@method_decorator(login_required, name='dispatch')
+class RatingView(View):
+    def post(self, request, product_id):
+        # Create or update the rating for a product
+        product = get_object_or_404(Product, id=product_id)
+        rating_value = request.POST.get('rating')
+
+        if not rating_value:
+            return JsonResponse({'error': 'Rating value is required!'}, status=400)
+
+        try:
+            rating_value = int(rating_value)
+            if rating_value < 1 or rating_value > 5:
+                return JsonResponse({'error': 'Rating must be between 1 and 5!'}, status=400)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid rating value!'}, status=400)
+
+        # Check if the user has already rated the product
+        rating, created = Rating.objects.update_or_create(
+            user=request.user,
+            product=product,
+            defaults={'rating': rating_value}
         )
-        product.save()
-        return JsonResponse({"message": "Product created successfully!"})
-    else:
-        return JsonResponse({"error": "Invalid request method."}, status=400)
-    
-def get_products(request):
-    products = Product.objects.all()
-    product_list = [
-        {
-            "id": product.id,
-            "name": product.name,
-            "description": product.description,
-            "price": str(product.price),
-            "image": product.image  # This will be the URL of the image
-        }
-        for product in products
-    ]
-    return JsonResponse(product_list, safe=False)
->>>>>>> 0da9d9919c2e0d416f821a2b0df46d12a2b74e28
+
+        return JsonResponse({'message': 'Rating submitted successfully!', 'rating': rating.rating}, status=201)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
+from .models import Product, Purchase
+
+class PurchaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        user = request.user
+        products = request.data.get("products", [])  # Expected format: [{"id": 1, "quantity": 2}, ...]
+
+        if not products:
+            return Response({"error": "No products provided."}, status=400)
+
+        purchases = []
+        for item in products:
+            try:
+                product = Product.objects.get(id=item["id"])
+                quantity = item.get("quantity", 1)
+                if quantity < 1:
+                    return Response({"error": "Quantity must be at least 1."}, status=400)
+
+                purchase = Purchase(user=user, product=product, quantity=quantity)
+                purchases.append(purchase)
+            except Product.DoesNotExist:
+                return Response({"error": f"Product with id {item['id']} not found."}, status=404)
+
+        # Bulk create all purchases
+        Purchase.objects.bulk_create(purchases)
+        return Response({"message": "Purchase successful."}, status=201)
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .models import Purchase
+
+class OrderHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        # Fetch all purchases made by the user
+        purchases = Purchase.objects.filter(user=user).select_related('product')
+        
+        # Prepare the data to return
+        order_history = [
+            {
+                "product_id": purchase.product.id,
+                "product_name": purchase.product.name,
+                "quantity": purchase.quantity,
+                "purchased_at": purchase.purchased_at.strftime('%Y-%m-%d %H:%M:%S')  # Assuming you have a `created_at` field
+            }
+            for purchase in purchases
+        ]
+
+        return Response({"order_history": order_history}, status=200)
